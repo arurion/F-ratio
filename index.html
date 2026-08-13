@@ -9,6 +9,12 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
+    /* iOS Safariなどのモバイルブラウザでの100vhはみ出し崩れを根絶する */
+    html, body {
+      height: 100%;
+      height: -webkit-fill-available;
+      overflow: hidden;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
       background-color: #EAF5FF; /* 上品なサックスホワイト */
@@ -23,33 +29,84 @@
     #settings-drawer {
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* スライダー進捗トラックの塗り分けスタイル */
+
+    /* ----------------------------------------------------
+       堅牢なスライダー・スタイリング (ブラウザ固有の崩れを防止)
+       ---------------------------------------------------- */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+      height: 24px; /* タップ領域を確保 */
+    }
+    input[type="range"]:focus {
+      outline: none;
+    }
+
+    /* トラック領域 (Webkit系: Chrome, Safari, Edgeなど) */
     input[type="range"]::-webkit-slider-runnable-track {
       background: linear-gradient(to right, #3b82f6 var(--value-percent, 30%), #cbd5e1 var(--value-percent, 30%));
       height: 6px;
       border-radius: 9999px;
+      transition: background 0.15s ease;
     }
+    /* つまみ領域 (Webkit系) */
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -5px; /* トラックの高さの中央に配置 */
+      background-color: #ffffff;
+      border: 2px solid #3b82f6;
+      height: 16px;
+      width: 16px;
+      border-radius: 9999px;
+      box-shadow: 0 2px 4px rgba(148, 163, 184, 0.3);
+      transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.2);
+    }
+
+    /* トラック領域 (Firefox) */
     input[type="range"]::-moz-range-track {
       background: linear-gradient(to right, #3b82f6 var(--value-percent, 30%), #cbd5e1 var(--value-percent, 30%));
       height: 6px;
       border-radius: 9999px;
     }
+    /* つまみ領域 (Firefox) */
+    input[type="range"]::-moz-range-thumb {
+      border: 2px solid #3b82f6;
+      height: 16px;
+      width: 16px;
+      border-radius: 9999px;
+      background-color: #ffffff;
+      box-shadow: 0 2px 4px rgba(148, 163, 184, 0.3);
+      cursor: pointer;
+      transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    input[type="range"]::-moz-range-thumb:active {
+      transform: scale(1.2);
+    }
   </style>
 </head>
-<body class="w-screen h-screen overflow-hidden flex flex-col relative text-slate-800 antialiased select-none">
+<body class="w-full h-full flex flex-col relative text-slate-800 antialiased select-none overflow-hidden">
 
   <!-- 背景のボケ光源 -->
   <div class="absolute -z-10 top-[-10%] left-[-15%] w-[65%] h-[45%] rounded-full bg-blue-200/20 blur-[120px] pointer-events-none"></div>
   <div class="absolute -z-10 bottom-[-5%] right-[-10%] w-[60%] h-[55%] rounded-full bg-indigo-100/20 blur-[140px] pointer-events-none"></div>
 
-  <!-- 1. ヘッダー (完全にドッキングした1つのウィンドウフレームとして機能) -->
+  <!-- 1. ヘッダー (完全に画面に吸着したひとつのOSウィンドウのように振る舞う) -->
   <header class="h-14 bg-white/10 backdrop-blur-md saturate-[130%] flex items-center justify-between px-4 shrink-0 z-10 border-b border-white/20">
     <div class="flex items-center gap-2">
       <i data-lucide="music-4" class="w-4 h-4 text-blue-500"></i>
-      <select id="select-dataset" class="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer pr-4 py-1 text-glow" onchange="switchDataset()">
-        <!-- 自動検出されたJSONがここに挿入されます -->
-        <option value="" disabled selected>読み込み中...</option>
-      </select>
+      <!-- プルダウン崩れを防ぐため、自前のティントガラス風コンテナでラップ -->
+      <div class="relative flex items-center">
+        <select id="select-dataset" class="appearance-none bg-white/40 hover:bg-white/60 active:bg-white border border-white/40 rounded-lg pl-2.5 pr-8 py-1 text-xs font-bold text-slate-700 focus:outline-none cursor-pointer transition-all text-glow shadow-sm" onchange="switchDataset()">
+          <option value="" disabled selected>読み込み中...</option>
+        </select>
+        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500 absolute right-2 pointer-events-none"></i>
+      </div>
     </div>
     <div class="flex items-center gap-2">
       <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" id="status-indicator"></span>
@@ -67,14 +124,14 @@
     </div>
   </div>
 
-  <!-- 3. メインエリア (Bento Gridを排し、流れるようなコンテキストを持った行リスト) -->
+  <!-- 3. メインエリア (不要なカード分割による閉塞感をなくしたシームレスな行リスト) -->
   <main class="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-28">
     <div id="intervals-list" class="space-y-1.5">
       <!-- JavaScriptで動的生成 -->
     </div>
   </main>
 
-  <!-- 4. ボトムコントロールパネル (ドッキングさせ浮かせない) -->
+  <!-- 4. ボトムコントロールパネル (画面最下部に完全にドッキング) -->
   <div class="fixed bottom-0 left-0 w-full bg-white/30 backdrop-blur-xl saturate-[130%] border-t border-white/40 p-4 z-20 flex items-center gap-3">
     <button id="btn-toggle-play" class="flex-1 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-medium text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-sm">
       <i data-lucide="play" class="w-4 h-4" id="play-icon"></i>
@@ -92,7 +149,7 @@
     </button>
   </div>
 
-  <!-- 5. 右側スライド設定ドロワー (身体感覚に準拠：右からスライドイン) -->
+  <!-- 5. 右側スライド設定ドロワー (右側のボタンから、右側よりスライドイン) -->
   <div id="settings-drawer" class="fixed inset-y-0 right-0 w-72 bg-white/60 backdrop-blur-2xl saturate-[130%] border-l border-white/40 z-30 shadow-2xl p-6 flex flex-col justify-between translate-x-full">
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -105,11 +162,14 @@
       <!-- 音色選択 -->
       <div class="space-y-2">
         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-glow">Timbre</label>
-        <select id="select-timbre" class="w-full bg-white/50 border border-slate-200/20 rounded-xl px-3 py-2.5 text-xs text-slate-700 focus:outline-none" onchange="updateTimbre()">
-          <option value="triangle">Triangle (おだやかな三角波)</option>
-          <option value="sine">Sine (純音：うなり計測向き)</option>
-          <option value="warm-pad">Warm Pad (暖かみのあるフィルター波)</option>
-        </select>
+        <div class="relative flex items-center">
+          <select id="select-timbre" class="appearance-none w-full bg-white/50 border border-slate-200/20 rounded-xl pl-3 pr-8 py-2.5 text-xs text-slate-700 focus:outline-none cursor-pointer" onchange="updateTimbre()">
+            <option value="triangle">Triangle (おだやかな三角波)</option>
+            <option value="sine">Sine (純音：うなり計測向き)</option>
+            <option value="warm-pad">Warm Pad (暖かみのあるフィルター波)</option>
+          </select>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-3 pointer-events-none"></i>
+        </div>
       </div>
 
       <!-- 基準ピッチスライダー -->
@@ -118,7 +178,7 @@
           <span class="font-bold text-slate-400 uppercase tracking-wider">Base Pitch</span>
           <span class="font-mono text-slate-600 text-xs" id="label-base-freq">C4 (261.63 Hz)</span>
         </div>
-        <input type="range" id="slider-base-freq" min="130" max="523" step="0.1" value="261.63" class="w-full accent-blue-500 cursor-pointer h-1.5 rounded-lg appearance-none" oninput="updateBaseFreq()">
+        <input type="range" id="slider-base-freq" min="130" max="523" step="0.1" value="261.63" class="w-full cursor-pointer" oninput="updateBaseFreq()">
         <div class="flex justify-between text-[9px] text-slate-400 font-mono">
           <span>C3 (130Hz)</span>
           <span>C5 (523Hz)</span>
@@ -131,7 +191,7 @@
           <span class="font-bold text-slate-400 uppercase tracking-wider">Volume</span>
           <span class="font-mono text-slate-600 text-xs" id="label-volume">30%</span>
         </div>
-        <input type="range" id="slider-volume" min="0" max="100" step="1" value="30" class="w-full accent-blue-500 cursor-pointer h-1.5 rounded-lg appearance-none" oninput="updateVolume()">
+        <input type="range" id="slider-volume" min="0" max="100" step="1" value="30" class="w-full cursor-pointer" oninput="updateVolume()">
       </div>
     </div>
 
@@ -149,7 +209,6 @@
   <script>
     // ----------------------------------------------------
     // フォールバック用のハードコード・データセット
-    // (万が一fetchが動かないローカル実行環境でもシームレスに機能するように準備)
     // ----------------------------------------------------
     const fallbackDatasets = [
       {
@@ -229,7 +288,6 @@
       if (discovered.length > 0) {
         loadedDatasets = discovered;
       } else {
-        // fetchが失敗またはファイルが無い場合はフォールバックを使用
         loadedDatasets = fallbackDatasets;
       }
 
@@ -245,7 +303,6 @@
         option.textContent = dataset.title;
         select.appendChild(option);
       });
-      // 初期データセット適用
       applyDataset(loadedDatasets[0]);
     }
 
@@ -254,7 +311,7 @@
       const index = parseInt(select.value);
       if (isPlaying) {
         stopOscillators();
-        document.getElementById('btn-toggle-play').click(); // 再生状態を一時停止にする
+        document.getElementById('btn-toggle-play').click(); // 再生状態を一時停止に戻す
       }
       applyDataset(loadedDatasets[index]);
     }
@@ -320,7 +377,7 @@
             </div>
           </div>
           
-          <div class="accordion-content overflow-hidden transition-all duration-300" style="max-height: ${isActive ? '80px' : '0px'}; opacity: ${isActive ? '1' : '0'};">
+          <div class="accordion-content overflow-hidden transition-all duration-300" style="max-height: ${isActive ? '200px' : '0px'}; opacity: ${isActive ? '1' : '0'};">
             <p class="text-[11px] text-slate-500 mt-2.5 pt-2 border-t border-slate-200/10 leading-relaxed text-glow">
               ${item.desc} <span class="font-medium text-slate-600">（12平均律比: ${item.deviation}）</span>
             </p>
@@ -362,17 +419,19 @@
     }
 
     // ----------------------------------------------------
-    // ドロワー開閉 (身体感覚: 右側のボタン、右から展開)
+    // ドロワー開閉 (右から開く身体的動作)
     // ----------------------------------------------------
     function toggleSettings(open) {
       const drawer = document.getElementById('settings-drawer');
       const overlay = document.getElementById('settings-overlay');
       if (open) {
         drawer.classList.remove('translate-x-full');
+        drawer.classList.add('translate-x-0');
         overlay.classList.remove('hidden');
         setTimeout(() => overlay.classList.add('opacity-100'), 10);
       } else {
         drawer.classList.add('translate-x-full');
+        drawer.classList.remove('translate-x-0');
         overlay.classList.remove('opacity-100');
         setTimeout(() => overlay.classList.add('hidden'), 300);
       }
@@ -574,7 +633,7 @@
     };
 
     // ----------------------------------------------------
-    // スライダー制御 ＆ スライダー進捗トラックの塗り分け
+    // スライダー制御 ＆ 進捗トラック動的塗り分け
     // ----------------------------------------------------
     function updateSliderTrack(inputElement) {
       const min = parseFloat(inputElement.min || 0);
@@ -636,7 +695,7 @@
         const width = canvas.width / window.devicePixelRatio;
         const height = canvas.height / window.devicePixelRatio;
 
-        canvasCtx.fillStyle = 'rgba(234, 245, 255, 0.25)'; // サックスホワイト背景とブレンド
+        canvasCtx.fillStyle = 'rgba(234, 245, 255, 0.25)'; // サックスホワイトとブレンド
         canvasCtx.fillRect(0, 0, width, height);
 
         if (!isPlaying || !analyser) {
