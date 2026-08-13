@@ -4,12 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Aero Interval Analyzer</title>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* iOS Safariなどのモバイルブラウザでの100vhはみ出し崩れを根絶する */
     html, body {
       height: 100%;
       height: -webkit-fill-available;
@@ -17,7 +14,7 @@
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
-      background-color: #EAF5FF; /* 上品なサックスホワイト */
+      background-color: #EAF5FF;
       touch-action: manipulation;
     }
     .text-glow {
@@ -30,32 +27,25 @@
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* ----------------------------------------------------
-       堅牢なスライダー・スタイリング (ブラウザ固有の崩れを防止)
-       ---------------------------------------------------- */
     input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
       background: transparent;
       cursor: pointer;
-      height: 24px; /* タップ領域を確保 */
+      height: 24px;
     }
-    input[type="range"]:focus {
-      outline: none;
-    }
+    input[type="range"]:focus { outline: none; }
 
-    /* トラック領域 (Webkit系: Chrome, Safari, Edgeなど) */
     input[type="range"]::-webkit-slider-runnable-track {
       background: linear-gradient(to right, #3b82f6 var(--value-percent, 30%), #cbd5e1 var(--value-percent, 30%));
       height: 6px;
       border-radius: 9999px;
       transition: background 0.15s ease;
     }
-    /* つまみ領域 (Webkit系) */
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      margin-top: -5px; /* トラックの高さの中央に配置 */
+      margin-top: -5px;
       background-color: #ffffff;
       border: 2px solid #3b82f6;
       height: 16px;
@@ -64,17 +54,13 @@
       box-shadow: 0 2px 4px rgba(148, 163, 184, 0.3);
       transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    input[type="range"]::-webkit-slider-thumb:active {
-      transform: scale(1.2);
-    }
+    input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); }
 
-    /* トラック領域 (Firefox) */
     input[type="range"]::-moz-range-track {
       background: linear-gradient(to right, #3b82f6 var(--value-percent, 30%), #cbd5e1 var(--value-percent, 30%));
       height: 6px;
       border-radius: 9999px;
     }
-    /* つまみ領域 (Firefox) */
     input[type="range"]::-moz-range-thumb {
       border: 2px solid #3b82f6;
       height: 16px;
@@ -85,22 +71,19 @@
       cursor: pointer;
       transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    input[type="range"]::-moz-range-thumb:active {
-      transform: scale(1.2);
-    }
+    input[type="range"]::-moz-range-thumb:active { transform: scale(1.2); }
   </style>
 </head>
 <body class="w-full h-full flex flex-col relative text-slate-800 antialiased select-none overflow-hidden">
 
-  <!-- 背景のボケ光源 -->
+  <!-- 背景光源 -->
   <div class="absolute -z-10 top-[-10%] left-[-15%] w-[65%] h-[45%] rounded-full bg-blue-200/20 blur-[120px] pointer-events-none"></div>
   <div class="absolute -z-10 bottom-[-5%] right-[-10%] w-[60%] h-[55%] rounded-full bg-indigo-100/20 blur-[140px] pointer-events-none"></div>
 
-  <!-- 1. ヘッダー (完全に画面に吸着したひとつのOSウィンドウのように振る舞う) -->
+  <!-- ヘッダー -->
   <header class="h-14 bg-white/10 backdrop-blur-md saturate-[130%] flex items-center justify-between px-4 shrink-0 z-10 border-b border-white/20">
     <div class="flex items-center gap-2">
       <i data-lucide="music-4" class="w-4 h-4 text-blue-500"></i>
-      <!-- プルダウン崩れを防ぐため、自前のティントガラス風コンテナでラップ -->
       <div class="relative flex items-center">
         <select id="select-dataset" class="appearance-none bg-white/40 hover:bg-white/60 active:bg-white border border-white/40 rounded-lg pl-2.5 pr-8 py-1 text-xs font-bold text-slate-700 focus:outline-none cursor-pointer transition-all text-glow shadow-sm" onchange="switchDataset()">
           <option value="" disabled selected>読み込み中...</option>
@@ -114,7 +97,7 @@
     </div>
   </header>
 
-  <!-- 2. 波形ビジュアライザー -->
+  <!-- 波形ビジュアライザー -->
   <div class="h-16 shrink-0 bg-white/5 relative overflow-hidden border-b border-slate-200/5">
     <canvas id="visualizer" class="w-full h-full"></canvas>
     <div class="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
@@ -124,14 +107,12 @@
     </div>
   </div>
 
-  <!-- 3. メインエリア (不要なカード分割による閉塞感をなくしたシームレスな行リスト) -->
+  <!-- メインエリア -->
   <main class="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-28">
-    <div id="intervals-list" class="space-y-1.5">
-      <!-- JavaScriptで動的生成 -->
-    </div>
+    <div id="intervals-list" class="space-y-1.5"></div>
   </main>
 
-  <!-- 4. ボトムコントロールパネル (画面最下部に完全にドッキング) -->
+  <!-- ボトムコントロールパネル -->
   <div class="fixed bottom-0 left-0 w-full bg-white/30 backdrop-blur-xl saturate-[130%] border-t border-white/40 p-4 z-20 flex items-center gap-3">
     <button id="btn-toggle-play" class="flex-1 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-medium text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-sm">
       <i data-lucide="play" class="w-4 h-4" id="play-icon"></i>
@@ -143,13 +124,12 @@
       <button id="mode-melodic" class="flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 text-slate-600" onclick="setPlayMode('melodic')">旋律</button>
     </div>
 
-    <!-- 右側のボタン：押すと右からドロワーが身体的直感に沿って開く -->
     <button id="btn-open-settings" class="w-12 h-12 rounded-xl bg-white/50 hover:bg-white/75 active:bg-white border border-white/40 flex items-center justify-center text-slate-600 transition-all shadow-sm" onclick="toggleSettings(true)">
       <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
     </button>
   </div>
 
-  <!-- 5. 右側スライド設定ドロワー (右側のボタンから、右側よりスライドイン) -->
+  <!-- 右側スライド設定ドロワー -->
   <div id="settings-drawer" class="fixed inset-y-0 right-0 w-72 bg-white/60 backdrop-blur-2xl saturate-[130%] border-l border-white/40 z-30 shadow-2xl p-6 flex flex-col justify-between translate-x-full">
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -180,8 +160,8 @@
         </div>
         <input type="range" id="slider-base-freq" min="130" max="523" step="0.1" value="261.63" class="w-full cursor-pointer" oninput="updateBaseFreq()">
         <div class="flex justify-between text-[9px] text-slate-400 font-mono">
-          <span>C3 (130Hz)</span>
-          <span>C5 (523Hz)</span>
+          <span>130Hz</span>
+          <span>523Hz</span>
         </div>
       </div>
 
@@ -207,9 +187,6 @@
   <div id="settings-overlay" class="fixed inset-0 bg-slate-900/5 backdrop-blur-[1px] z-20 hidden transition-opacity duration-300 opacity-0" onclick="toggleSettings(false)"></div>
 
   <script>
-    // ----------------------------------------------------
-    // フォールバック用のハードコード・データセット
-    // ----------------------------------------------------
     const fallbackDatasets = [
       {
         id: "major-6th",
@@ -257,19 +234,32 @@
     let analyser = null;
     let animationFrameId = null;
     let dataArray = null;
-
     let melodicIntervalId = null;
     let melodicStep = 0;
 
-    // ----------------------------------------------------
-    // オートディスカバリー (連番JSONの自動検出ロード)
-    // ----------------------------------------------------
+    // 12平均律(A=440Hz)を定規として使い、音名とセントズレを算出
+    function freqToNoteRef(freq) {
+      if (!freq || freq <= 0) return "--";
+      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const midiFloat = 12 * Math.log2(freq / 440) + 69;
+      const midiNote = Math.round(midiFloat);
+      const centsOffset = Math.round((midiFloat - midiNote) * 100);
+      
+      const noteIndex = ((midiNote % 12) + 12) % 12;
+      const octave = Math.floor(midiNote / 12) - 1;
+      
+      const sign = centsOffset > 0 ? '+' : '';
+      const offsetStr = centsOffset !== 0 ? ` ${sign}${centsOffset}¢` : '';
+      
+      return `${noteNames[noteIndex]}${octave}${offsetStr}`;
+    }
+
     async function loadDatasets() {
       let index = 1;
       let hasMore = true;
       const discovered = [];
 
-      while (hasMore && index <= 10) { // 最大10番まで走査
+      while (hasMore && index <= 10) {
         const filename = `data_${index}.json`;
         try {
           const response = await fetch(filename);
@@ -285,12 +275,7 @@
         }
       }
 
-      if (discovered.length > 0) {
-        loadedDatasets = discovered;
-      } else {
-        loadedDatasets = fallbackDatasets;
-      }
-
+      loadedDatasets = discovered.length > 0 ? discovered : fallbackDatasets;
       setupDatasetSelector();
     }
 
@@ -311,7 +296,7 @@
       const index = parseInt(select.value);
       if (isPlaying) {
         stopOscillators();
-        document.getElementById('btn-toggle-play').click(); // 再生状態を一時停止に戻す
+        document.getElementById('btn-toggle-play').click();
       }
       applyDataset(loadedDatasets[index]);
     }
@@ -320,25 +305,20 @@
       currentDataset = dataset;
       baseFreq = dataset.defaultBaseFreq || 261.63;
       
-      // スライダー類を初期化
       const baseSlider = document.getElementById('slider-base-freq');
       baseSlider.value = baseFreq;
       updateSliderTrack(baseSlider);
-      document.getElementById('label-base-freq').textContent = `C4 (${baseFreq.toFixed(1)} Hz)`;
-
-      // 右側のアナリティクスのラベル書き換え
+      
+      const noteRef = freqToNoteRef(baseFreq);
+      document.getElementById('label-base-freq').textContent = `${noteRef} (${baseFreq.toFixed(1)} Hz)`;
       document.getElementById('drawer-label-target').firstElementChild.textContent = `${dataset.targetName || 'Target'}:`;
 
-      // 最初の音律を選択
       activeIntervalId = dataset.intervals[0].id;
       
       renderList();
       updateIndicatorValues();
     }
 
-    // ----------------------------------------------------
-    // リスト描画とインタラクション
-    // ----------------------------------------------------
     const listContainer = document.getElementById('intervals-list');
     
     function renderList() {
@@ -379,7 +359,7 @@
           
           <div class="accordion-content overflow-hidden transition-all duration-300" style="max-height: ${isActive ? '200px' : '0px'}; opacity: ${isActive ? '1' : '0'};">
             <p class="text-[11px] text-slate-500 mt-2.5 pt-2 border-t border-slate-200/10 leading-relaxed text-glow">
-              ${item.desc} <span class="font-medium text-slate-600">（12平均律比: ${item.deviation}）</span>
+              ${item.desc} <span class="font-medium text-slate-600">（12TET基準差: ${item.deviation}）</span>
             </p>
           </div>
         `;
@@ -418,9 +398,6 @@
       document.getElementById('drawer-val-cents').textContent = `${current.cents.toFixed(2)} ¢`;
     }
 
-    // ----------------------------------------------------
-    // ドロワー開閉 (右から開く身体的動作)
-    // ----------------------------------------------------
     function toggleSettings(open) {
       const drawer = document.getElementById('settings-drawer');
       const overlay = document.getElementById('settings-overlay');
@@ -437,9 +414,6 @@
       }
     }
 
-    // ----------------------------------------------------
-    // Web Audio 音声合成処理
-    // ----------------------------------------------------
     function initAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -479,7 +453,6 @@
 
     function startOscillators() {
       initAudio();
-      
       const ratio = getActiveRatio();
       const oscType = getOscType();
 
@@ -495,13 +468,11 @@
 
       oscBase.connect(gainBase);
       gainBase.connect(filterNode);
-      
       oscTarget.connect(gainTarget);
       gainTarget.connect(filterNode);
 
       gainBase.gain.setValueAtTime(0, audioCtx.currentTime);
       gainTarget.gain.setValueAtTime(0, audioCtx.currentTime);
-
       filterNode.frequency.setValueAtTime(timbre === 'warm-pad' ? 700 : timbre === 'sine' ? 2000 : 1000, audioCtx.currentTime);
 
       oscBase.start();
@@ -517,7 +488,6 @@
 
     function stopOscillators() {
       stopMelodicSequence();
-
       const tempGainBase = gainBase;
       const tempGainTarget = gainTarget;
       const tempOscBase = oscBase;
@@ -526,7 +496,6 @@
       if (tempGainBase && tempGainTarget) {
         tempGainBase.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
         tempGainTarget.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
-        
         setTimeout(() => {
           try {
             tempOscBase.stop();
@@ -566,7 +535,6 @@
           melodicStep = 0;
         }
       }
-
       tick();
       melodicIntervalId = setInterval(tick, intervalMs);
     }
@@ -588,7 +556,6 @@
       if (mode === 'harmonic') {
         btnHarmonic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 bg-white shadow-sm text-slate-800';
         btnMelodic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 text-slate-500';
-        
         stopMelodicSequence();
         if (isPlaying && gainBase && gainTarget) {
           gainBase.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
@@ -597,10 +564,7 @@
       } else {
         btnMelodic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 bg-white shadow-sm text-slate-800';
         btnHarmonic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 text-slate-500';
-        
-        if (isPlaying) {
-          startMelodicSequence();
-        }
+        if (isPlaying) startMelodicSequence();
       }
     }
 
@@ -632,9 +596,6 @@
       updateIndicatorValues();
     };
 
-    // ----------------------------------------------------
-    // スライダー制御 ＆ 進捗トラック動的塗り分け
-    // ----------------------------------------------------
     function updateSliderTrack(inputElement) {
       const min = parseFloat(inputElement.min || 0);
       const max = parseFloat(inputElement.max || 100);
@@ -657,7 +618,9 @@
       const slider = document.getElementById('slider-base-freq');
       updateSliderTrack(slider);
       baseFreq = parseFloat(slider.value);
-      document.getElementById('label-base-freq').textContent = `C4 (${baseFreq.toFixed(1)} Hz)`;
+      
+      const noteRef = freqToNoteRef(baseFreq);
+      document.getElementById('label-base-freq').textContent = `${noteRef} (${baseFreq.toFixed(1)} Hz)`;
 
       if (isPlaying && oscBase && oscTarget && audioCtx) {
         const ratio = getActiveRatio();
@@ -675,9 +638,6 @@
       }
     }
 
-    // ----------------------------------------------------
-    // ビジュアライザー描画
-    // ----------------------------------------------------
     function setupVisualizer() {
       const canvas = document.getElementById('visualizer');
       const canvasCtx = canvas.getContext('2d');
@@ -695,7 +655,7 @@
         const width = canvas.width / window.devicePixelRatio;
         const height = canvas.height / window.devicePixelRatio;
 
-        canvasCtx.fillStyle = 'rgba(234, 245, 255, 0.25)'; // サックスホワイトとブレンド
+        canvasCtx.fillStyle = 'rgba(234, 245, 255, 0.25)';
         canvasCtx.fillRect(0, 0, width, height);
 
         if (!isPlaying || !analyser) {
@@ -718,37 +678,25 @@
         canvasCtx.strokeStyle = gradient;
 
         canvasCtx.beginPath();
-
         const sliceWidth = width * 1.0 / dataArray.length;
         let x = 0;
 
         for (let i = 0; i < dataArray.length; i++) {
           const v = dataArray[i] / 128.0;
           const y = v * height / 2;
-
-          if (i === 0) {
-            canvasCtx.moveTo(x, y);
-          } else {
-            canvasCtx.lineTo(x, y);
-          }
+          if (i === 0) canvasCtx.moveTo(x, y);
+          else canvasCtx.lineTo(x, y);
           x += sliceWidth;
         }
-
         canvasCtx.lineTo(width, height / 2);
         canvasCtx.stroke();
       }
-
       draw();
     }
 
-    // ----------------------------------------------------
-    // 起動処理
-    // ----------------------------------------------------
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       loadDatasets();
-      
-      // スライダー進捗の初期レンダリング
       updateSliderTrack(document.getElementById('slider-base-freq'));
       updateSliderTrack(document.getElementById('slider-volume'));
     });
