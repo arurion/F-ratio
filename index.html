@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aero Interval Analyzer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
+      background-color: #EAF5FF; /* 上品なサックスホワイト */
+      touch-action: manipulation;
+    }
+    .text-glow {
+      text-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.5);
+    }
+    .accordion-content {
+      transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    }
+    #settings-drawer {
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* スライダー進捗トラックの塗り分けスタイル */
+    input[type="range"]::-webkit-slider-runnable-track {
+      background: linear-gradient(to right, #3b82f6 var(--value-percent, 30%), #cbd5e1 var(--value-percent, 30%));
+      height: 6px;
+      border-radius: 9999px;
+    }
+    input[type="range"]::-moz-range-track {
+      background: linear-gradient(to right, #3b82f6 var(--value-percent, 30%), #cbd5e1 var(--value-percent, 30%));
+      height: 6px;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen overflow-hidden flex flex-col relative text-slate-800 antialiased select-none">
+
+  <!-- 背景のボケ光源 -->
+  <div class="absolute -z-10 top-[-10%] left-[-15%] w-[65%] h-[45%] rounded-full bg-blue-200/20 blur-[120px] pointer-events-none"></div>
+  <div class="absolute -z-10 bottom-[-5%] right-[-10%] w-[60%] h-[55%] rounded-full bg-indigo-100/20 blur-[140px] pointer-events-none"></div>
+
+  <!-- 1. ヘッダー (完全にドッキングした1つのウィンドウフレームとして機能) -->
+  <header class="h-14 bg-white/10 backdrop-blur-md saturate-[130%] flex items-center justify-between px-4 shrink-0 z-10 border-b border-white/20">
+    <div class="flex items-center gap-2">
+      <i data-lucide="music-4" class="w-4 h-4 text-blue-500"></i>
+      <select id="select-dataset" class="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer pr-4 py-1 text-glow" onchange="switchDataset()">
+        <!-- 自動検出されたJSONがここに挿入されます -->
+        <option value="" disabled selected>読み込み中...</option>
+      </select>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" id="status-indicator"></span>
+      <span class="text-[10px] text-slate-500 font-medium tracking-wide text-glow" id="status-text">Audio Ready</span>
+    </div>
+  </header>
+
+  <!-- 2. 波形ビジュアライザー -->
+  <div class="h-16 shrink-0 bg-white/5 relative overflow-hidden border-b border-slate-200/5">
+    <canvas id="visualizer" class="w-full h-full"></canvas>
+    <div class="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
+      <div class="text-[10px] text-slate-400 font-mono text-glow" id="val-base-freq-display">Base: --Hz</div>
+      <div class="text-[11px] font-semibold text-slate-700 bg-white/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-white/40 text-glow" id="val-cents-display">Select an Interval</div>
+      <div class="text-[10px] text-slate-400 font-mono text-glow" id="val-target-freq-display">Target: --Hz</div>
+    </div>
+  </div>
+
+  <!-- 3. メインエリア (Bento Gridを排し、流れるようなコンテキストを持った行リスト) -->
+  <main class="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-28">
+    <div id="intervals-list" class="space-y-1.5">
+      <!-- JavaScriptで動的生成 -->
+    </div>
+  </main>
+
+  <!-- 4. ボトムコントロールパネル (ドッキングさせ浮かせない) -->
+  <div class="fixed bottom-0 left-0 w-full bg-white/30 backdrop-blur-xl saturate-[130%] border-t border-white/40 p-4 z-20 flex items-center gap-3">
+    <button id="btn-toggle-play" class="flex-1 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-medium text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-sm">
+      <i data-lucide="play" class="w-4 h-4" id="play-icon"></i>
+      <span id="play-text">再生</span>
+    </button>
+
+    <div class="flex p-1 bg-slate-950/5 rounded-xl h-12 items-center w-32 shrink-0">
+      <button id="mode-harmonic" class="flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 bg-white shadow-sm text-slate-800" onclick="setPlayMode('harmonic')">和音</button>
+      <button id="mode-melodic" class="flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 text-slate-600" onclick="setPlayMode('melodic')">旋律</button>
+    </div>
+
+    <!-- 右側のボタン：押すと右からドロワーが身体的直感に沿って開く -->
+    <button id="btn-open-settings" class="w-12 h-12 rounded-xl bg-white/50 hover:bg-white/75 active:bg-white border border-white/40 flex items-center justify-center text-slate-600 transition-all shadow-sm" onclick="toggleSettings(true)">
+      <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+    </button>
+  </div>
+
+  <!-- 5. 右側スライド設定ドロワー (身体感覚に準拠：右からスライドイン) -->
+  <div id="settings-drawer" class="fixed inset-y-0 right-0 w-72 bg-white/60 backdrop-blur-2xl saturate-[130%] border-l border-white/40 z-30 shadow-2xl p-6 flex flex-col justify-between translate-x-full">
+    <div class="space-y-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider text-glow">Sound Settings</h3>
+        <button class="w-8 h-8 rounded-lg bg-slate-200/20 flex items-center justify-center hover:bg-slate-200/40 text-slate-500" onclick="toggleSettings(false)">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- 音色選択 -->
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-glow">Timbre</label>
+        <select id="select-timbre" class="w-full bg-white/50 border border-slate-200/20 rounded-xl px-3 py-2.5 text-xs text-slate-700 focus:outline-none" onchange="updateTimbre()">
+          <option value="triangle">Triangle (おだやかな三角波)</option>
+          <option value="sine">Sine (純音：うなり計測向き)</option>
+          <option value="warm-pad">Warm Pad (暖かみのあるフィルター波)</option>
+        </select>
+      </div>
+
+      <!-- 基準ピッチスライダー -->
+      <div class="space-y-2">
+        <div class="flex justify-between items-center text-[10px] text-glow">
+          <span class="font-bold text-slate-400 uppercase tracking-wider">Base Pitch</span>
+          <span class="font-mono text-slate-600 text-xs" id="label-base-freq">C4 (261.63 Hz)</span>
+        </div>
+        <input type="range" id="slider-base-freq" min="130" max="523" step="0.1" value="261.63" class="w-full accent-blue-500 cursor-pointer h-1.5 rounded-lg appearance-none" oninput="updateBaseFreq()">
+        <div class="flex justify-between text-[9px] text-slate-400 font-mono">
+          <span>C3 (130Hz)</span>
+          <span>C5 (523Hz)</span>
+        </div>
+      </div>
+
+      <!-- 音量スライダー -->
+      <div class="space-y-2">
+        <div class="flex justify-between items-center text-[10px] text-glow">
+          <span class="font-bold text-slate-400 uppercase tracking-wider">Volume</span>
+          <span class="font-mono text-slate-600 text-xs" id="label-volume">30%</span>
+        </div>
+        <input type="range" id="slider-volume" min="0" max="100" step="1" value="30" class="w-full accent-blue-500 cursor-pointer h-1.5 rounded-lg appearance-none" oninput="updateVolume()">
+      </div>
+    </div>
+
+    <!-- リアルタイム・アナリティクス -->
+    <div class="pt-4 border-t border-slate-200/10 text-[10px] text-slate-400 space-y-1.5 font-mono">
+      <div class="flex justify-between"><span>Base:</span><span id="drawer-val-base">-- Hz</span></div>
+      <div class="flex justify-between" id="drawer-label-target"><span>Target:</span><span id="drawer-val-target">-- Hz</span></div>
+      <div class="flex justify-between"><span>Cents:</span><span id="drawer-val-cents">-- ¢</span></div>
+    </div>
+  </div>
+
+  <!-- オーバーレイ -->
+  <div id="settings-overlay" class="fixed inset-0 bg-slate-900/5 backdrop-blur-[1px] z-20 hidden transition-opacity duration-300 opacity-0" onclick="toggleSettings(false)"></div>
+
+  <script>
+    // ----------------------------------------------------
+    // フォールバック用のハードコード・データセット
+    // (万が一fetchが動かないローカル実行環境でもシームレスに機能するように準備)
+    // ----------------------------------------------------
+    const fallbackDatasets = [
+      {
+        id: "major-6th",
+        title: "Major 6th Interval Family",
+        description: "純正律(5:3)から19限界の精密なハイブリッド(855:512)まで、様々な「長6度」の周波数比を比較試聴します。",
+        defaultBaseFreq: 261.63,
+        targetName: "6th",
+        intervals: [
+          { id: "ratio-5-3", name: "5:3 純正長6度 (5限界)", ratio: 1.6666666666666667, ratioText: "5:3", cents: 884.36, deviation: "-15.6¢", tag: "5限界純正律", desc: "第5倍音に基づく純正長6度。うなりが完全に解消された極めて純粋な協和を示します。" },
+          { id: "ratio-855-512", name: "855:512 長6度 (19限界ハイブリッド)", ratio: 1.669921875, ratioText: "855:512", cents: 887.73, deviation: "-12.3¢", tag: "19限界・みなし基音防衛", desc: "5:3とミーントーンの間に緻密に配置された調和的な19限界長6度です。" },
+          { id: "ratio-12tet", name: "12平均律 長6度", ratio: 1.681792830507429, ratioText: "2^(3/4)", cents: 900.0, deviation: "0.0¢", tag: "世界標準", desc: "オクターブを12等分した標準。利便性が高い一方、純正な響きからはわずかに外れます。" }
+        ]
+      },
+      {
+        id: "minor-3rd",
+        title: "Minor 3rd Interval Family",
+        description: "純正律(6:5)の極めて澄んだ協和からピタゴラス、セプティマル(7:6)まで、様々な「短3度」の周波数比を比較試聴します。",
+        defaultBaseFreq: 261.63,
+        targetName: "3rd",
+        intervals: [
+          { id: "ratio-12tet", name: "12平均律 短3度", ratio: 1.189207115002721, ratioText: "2^(3/12)", cents: 300.0, deviation: "0.0¢", tag: "世界標準", desc: "標準的な短3度。純正律に比べてやや狭く、独特のうなりを伴います。" },
+          { id: "ratio-6-5", name: "6:5 純正短3度 (5限界)", ratio: 1.2, ratioText: "6:5", cents: 315.64, deviation: "+15.6¢", tag: "5限界純正律", desc: "倍音比6:5に基づく純正短3度。うなりが完全に消失した透明感の高い響きを奏でます。" }
+        ]
+      }
+    ];
+
+    let currentDataset = null;
+    let activeIntervalId = '';
+    let loadedDatasets = [];
+
+    // Web Audio API State
+    let audioCtx = null;
+    let isPlaying = false;
+    let playMode = 'harmonic'; 
+    let timbre = 'triangle';
+    let baseFreq = 261.63; 
+    let volume = 0.3;
+
+    let oscBase = null;
+    let oscTarget = null;
+    let gainBase = null;
+    let gainTarget = null;
+    let filterNode = null;
+    let masterGain = null;
+    let analyser = null;
+    let animationFrameId = null;
+    let dataArray = null;
+
+    let melodicIntervalId = null;
+    let melodicStep = 0;
+
+    // ----------------------------------------------------
+    // オートディスカバリー (連番JSONの自動検出ロード)
+    // ----------------------------------------------------
+    async function loadDatasets() {
+      let index = 1;
+      let hasMore = true;
+      const discovered = [];
+
+      while (hasMore && index <= 10) { // 最大10番まで走査
+        const filename = `data_${index}.json`;
+        try {
+          const response = await fetch(filename);
+          if (response.ok) {
+            const data = await response.json();
+            discovered.push(data);
+            index++;
+          } else {
+            hasMore = false;
+          }
+        } catch (e) {
+          hasMore = false;
+        }
+      }
+
+      if (discovered.length > 0) {
+        loadedDatasets = discovered;
+      } else {
+        // fetchが失敗またはファイルが無い場合はフォールバックを使用
+        loadedDatasets = fallbackDatasets;
+      }
+
+      setupDatasetSelector();
+    }
+
+    function setupDatasetSelector() {
+      const select = document.getElementById('select-dataset');
+      select.innerHTML = '';
+      loadedDatasets.forEach((dataset, idx) => {
+        const option = document.createElement('option');
+        option.value = idx;
+        option.textContent = dataset.title;
+        select.appendChild(option);
+      });
+      // 初期データセット適用
+      applyDataset(loadedDatasets[0]);
+    }
+
+    function switchDataset() {
+      const select = document.getElementById('select-dataset');
+      const index = parseInt(select.value);
+      if (isPlaying) {
+        stopOscillators();
+        document.getElementById('btn-toggle-play').click(); // 再生状態を一時停止にする
+      }
+      applyDataset(loadedDatasets[index]);
+    }
+
+    function applyDataset(dataset) {
+      currentDataset = dataset;
+      baseFreq = dataset.defaultBaseFreq || 261.63;
+      
+      // スライダー類を初期化
+      const baseSlider = document.getElementById('slider-base-freq');
+      baseSlider.value = baseFreq;
+      updateSliderTrack(baseSlider);
+      document.getElementById('label-base-freq').textContent = `C4 (${baseFreq.toFixed(1)} Hz)`;
+
+      // 右側のアナリティクスのラベル書き換え
+      document.getElementById('drawer-label-target').firstElementChild.textContent = `${dataset.targetName || 'Target'}:`;
+
+      // 最初の音律を選択
+      activeIntervalId = dataset.intervals[0].id;
+      
+      renderList();
+      updateIndicatorValues();
+    }
+
+    // ----------------------------------------------------
+    // リスト描画とインタラクション
+    // ----------------------------------------------------
+    const listContainer = document.getElementById('intervals-list');
+    
+    function renderList() {
+      if (!currentDataset) return;
+      listContainer.innerHTML = '';
+      currentDataset.intervals.forEach(item => {
+        const isActive = item.id === activeIntervalId;
+        const activeClass = isActive 
+          ? 'bg-white/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_6px_12px_rgba(148,163,184,0.08)] border-slate-200/10' 
+          : 'bg-white/10 hover:bg-white/20 border-transparent';
+        const indicatorColor = isActive ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-300';
+        const textStyle = isActive ? 'text-slate-800 font-semibold' : 'text-slate-600';
+
+        const row = document.createElement('div');
+        row.className = `p-3.5 rounded-xl border cursor-pointer transition-all duration-300 ${activeClass}`;
+        row.onclick = () => selectInterval(item.id);
+
+        row.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 overflow-hidden">
+              <div class="w-2.5 h-2.5 rounded-full ${indicatorColor} shrink-0 transition-all duration-300"></div>
+              <div class="truncate">
+                <span class="text-xs font-medium text-slate-800 text-glow block truncate">${item.name}</span>
+                <span class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider block mt-0.5">${item.tag}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 shrink-0 text-right font-mono">
+              <div>
+                <span class="text-[9px] text-slate-400 block">RATIO</span>
+                <span class="text-xs ${textStyle} text-glow block truncate max-w-[70px]">${item.ratioText}</span>
+              </div>
+              <div class="w-14">
+                <span class="text-[9px] text-slate-400 block">CENTS</span>
+                <span class="text-xs ${textStyle} text-glow block">${item.cents.toFixed(1)}¢</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="accordion-content overflow-hidden transition-all duration-300" style="max-height: ${isActive ? '80px' : '0px'}; opacity: ${isActive ? '1' : '0'};">
+            <p class="text-[11px] text-slate-500 mt-2.5 pt-2 border-t border-slate-200/10 leading-relaxed text-glow">
+              ${item.desc} <span class="font-medium text-slate-600">（12平均律比: ${item.deviation}）</span>
+            </p>
+          </div>
+        `;
+        listContainer.appendChild(row);
+      });
+    }
+
+    function selectInterval(id) {
+      activeIntervalId = id;
+      renderList();
+      
+      const current = currentDataset.intervals.find(i => i.id === id);
+      
+      if (isPlaying && oscTarget && audioCtx) {
+        const targetFreq = baseFreq * current.ratio;
+        oscTarget.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.08);
+      }
+      updateIndicatorValues();
+    }
+
+    function updateIndicatorValues() {
+      if (!currentDataset) return;
+      const current = currentDataset.intervals.find(i => i.id === activeIntervalId);
+      if (!current) return;
+
+      const valBase = `${baseFreq.toFixed(1)}Hz`;
+      const valTarget = `${(baseFreq * current.ratio).toFixed(1)}Hz`;
+      const valCents = `${current.name.split(' ')[0]} : ${current.cents.toFixed(1)}¢`;
+
+      document.getElementById('val-base-freq-display').textContent = `Base: ${valBase}`;
+      document.getElementById('val-target-freq-display').textContent = `${currentDataset.targetName || 'Target'}: ${valTarget}`;
+      document.getElementById('val-cents-display').textContent = valCents;
+
+      document.getElementById('drawer-val-base').textContent = `${baseFreq.toFixed(2)} Hz`;
+      document.getElementById('drawer-val-target').textContent = `${(baseFreq * current.ratio).toFixed(2)} Hz`;
+      document.getElementById('drawer-val-cents').textContent = `${current.cents.toFixed(2)} ¢`;
+    }
+
+    // ----------------------------------------------------
+    // ドロワー開閉 (身体感覚: 右側のボタン、右から展開)
+    // ----------------------------------------------------
+    function toggleSettings(open) {
+      const drawer = document.getElementById('settings-drawer');
+      const overlay = document.getElementById('settings-overlay');
+      if (open) {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.add('opacity-100'), 10);
+      } else {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.remove('opacity-100');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+      }
+    }
+
+    // ----------------------------------------------------
+    // Web Audio 音声合成処理
+    // ----------------------------------------------------
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        filterNode = audioCtx.createBiquadFilter();
+        filterNode.type = 'lowpass';
+        filterNode.frequency.setValueAtTime(timbre === 'sine' ? 2000 : 900, audioCtx.currentTime);
+        
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(volume, audioCtx.currentTime);
+        
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        
+        filterNode.connect(analyser);
+        analyser.connect(masterGain);
+        masterGain.connect(audioCtx.destination);
+
+        setupVisualizer();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function getActiveRatio() {
+      if (!currentDataset) return 1.0;
+      const current = currentDataset.intervals.find(i => i.id === activeIntervalId);
+      return current ? current.ratio : 1.0;
+    }
+
+    function getOscType() {
+      return timbre === 'warm-pad' ? 'sawtooth' : timbre;
+    }
+
+    function startOscillators() {
+      initAudio();
+      
+      const ratio = getActiveRatio();
+      const oscType = getOscType();
+
+      oscBase = audioCtx.createOscillator();
+      oscBase.type = oscType;
+      oscBase.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+      gainBase = audioCtx.createGain();
+      
+      oscTarget = audioCtx.createOscillator();
+      oscTarget.type = oscType;
+      oscTarget.frequency.setValueAtTime(baseFreq * ratio, audioCtx.currentTime);
+      gainTarget = audioCtx.createGain();
+
+      oscBase.connect(gainBase);
+      gainBase.connect(filterNode);
+      
+      oscTarget.connect(gainTarget);
+      gainTarget.connect(filterNode);
+
+      gainBase.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainTarget.gain.setValueAtTime(0, audioCtx.currentTime);
+
+      filterNode.frequency.setValueAtTime(timbre === 'warm-pad' ? 700 : timbre === 'sine' ? 2000 : 1000, audioCtx.currentTime);
+
+      oscBase.start();
+      oscTarget.start();
+
+      if (playMode === 'harmonic') {
+        gainBase.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+        gainTarget.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+      } else {
+        startMelodicSequence();
+      }
+    }
+
+    function stopOscillators() {
+      stopMelodicSequence();
+
+      const tempGainBase = gainBase;
+      const tempGainTarget = gainTarget;
+      const tempOscBase = oscBase;
+      const tempOscTarget = oscTarget;
+
+      if (tempGainBase && tempGainTarget) {
+        tempGainBase.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
+        tempGainTarget.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
+        
+        setTimeout(() => {
+          try {
+            tempOscBase.stop();
+            tempOscTarget.stop();
+            tempOscBase.disconnect();
+            tempOscTarget.disconnect();
+          } catch(e) {}
+        }, 60);
+      }
+
+      oscBase = null;
+      oscTarget = null;
+      gainBase = null;
+      gainTarget = null;
+    }
+
+    function startMelodicSequence() {
+      stopMelodicSequence();
+      melodicStep = 0;
+      const intervalMs = 400;
+
+      function tick() {
+        if (!gainBase || !gainTarget) return;
+        const now = audioCtx.currentTime;
+
+        if (melodicStep === 0) {
+          gainBase.gain.setTargetAtTime(0.6, now, 0.02);
+          gainTarget.gain.setTargetAtTime(0.0, now, 0.02);
+          melodicStep = 1;
+        } else if (melodicStep === 1) {
+          gainBase.gain.setTargetAtTime(0.0, now, 0.02);
+          gainTarget.gain.setTargetAtTime(0.6, now, 0.02);
+          melodicStep = 2;
+        } else {
+          gainBase.gain.setTargetAtTime(0.4, now, 0.02);
+          gainTarget.gain.setTargetAtTime(0.4, now, 0.02);
+          melodicStep = 0;
+        }
+      }
+
+      tick();
+      melodicIntervalId = setInterval(tick, intervalMs);
+    }
+
+    function stopMelodicSequence() {
+      if (melodicIntervalId) {
+        clearInterval(melodicIntervalId);
+        melodicIntervalId = null;
+      }
+    }
+
+    function setPlayMode(mode) {
+      if (playMode === mode) return;
+      playMode = mode;
+
+      const btnHarmonic = document.getElementById('mode-harmonic');
+      const btnMelodic = document.getElementById('mode-melodic');
+
+      if (mode === 'harmonic') {
+        btnHarmonic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 bg-white shadow-sm text-slate-800';
+        btnMelodic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 text-slate-500';
+        
+        stopMelodicSequence();
+        if (isPlaying && gainBase && gainTarget) {
+          gainBase.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+          gainTarget.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+        }
+      } else {
+        btnMelodic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 bg-white shadow-sm text-slate-800';
+        btnHarmonic.className = 'flex-1 h-full text-[11px] font-semibold rounded-lg transition-all duration-300 text-slate-500';
+        
+        if (isPlaying) {
+          startMelodicSequence();
+        }
+      }
+    }
+
+    const playBtn = document.getElementById('btn-toggle-play');
+    const playIcon = document.getElementById('play-icon');
+    const playText = document.getElementById('play-text');
+    const statusIndicator = document.getElementById('status-indicator');
+    const statusText = document.getElementById('status-text');
+
+    playBtn.onclick = () => {
+      if (!isPlaying) {
+        isPlaying = true;
+        playBtn.className = "flex-1 h-12 rounded-xl bg-slate-800 text-white font-medium text-sm transition-all duration-300 shadow-md flex items-center justify-center gap-2";
+        playIcon.setAttribute('data-lucide', 'square');
+        playText.textContent = '停止';
+        statusIndicator.className = 'inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse';
+        statusText.textContent = 'Playing';
+        startOscillators();
+      } else {
+        isPlaying = false;
+        playBtn.className = "flex-1 h-12 rounded-xl bg-blue-500 text-white font-medium text-sm transition-all duration-300 shadow-md flex items-center justify-center gap-2";
+        playIcon.setAttribute('data-lucide', 'play');
+        playText.textContent = '再生';
+        statusIndicator.className = 'inline-block w-1.5 h-1.5 rounded-full bg-emerald-400';
+        statusText.textContent = 'Ready';
+        stopOscillators();
+      }
+      lucide.createIcons();
+      updateIndicatorValues();
+    };
+
+    // ----------------------------------------------------
+    // スライダー制御 ＆ スライダー進捗トラックの塗り分け
+    // ----------------------------------------------------
+    function updateSliderTrack(inputElement) {
+      const min = parseFloat(inputElement.min || 0);
+      const max = parseFloat(inputElement.max || 100);
+      const val = parseFloat(inputElement.value);
+      const percentage = ((val - min) / (max - min)) * 100;
+      inputElement.style.setProperty('--value-percent', `${percentage}%`);
+    }
+
+    function updateVolume() {
+      const slider = document.getElementById('slider-volume');
+      updateSliderTrack(slider);
+      volume = parseInt(slider.value) / 100 * 0.4;
+      document.getElementById('label-volume').textContent = `${slider.value}%`;
+      if (masterGain && audioCtx) {
+        masterGain.gain.setValueAtTime(volume, audioCtx.currentTime);
+      }
+    }
+
+    function updateBaseFreq() {
+      const slider = document.getElementById('slider-base-freq');
+      updateSliderTrack(slider);
+      baseFreq = parseFloat(slider.value);
+      document.getElementById('label-base-freq').textContent = `C4 (${baseFreq.toFixed(1)} Hz)`;
+
+      if (isPlaying && oscBase && oscTarget && audioCtx) {
+        const ratio = getActiveRatio();
+        oscBase.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+        oscTarget.frequency.setTargetAtTime(baseFreq * ratio, audioCtx.currentTime, 0.05);
+      }
+      updateIndicatorValues();
+    }
+
+    function updateTimbre() {
+      timbre = document.getElementById('select-timbre').value;
+      if (isPlaying) {
+        stopOscillators();
+        startOscillators();
+      }
+    }
+
+    // ----------------------------------------------------
+    // ビジュアライザー描画
+    // ----------------------------------------------------
+    function setupVisualizer() {
+      const canvas = document.getElementById('visualizer');
+      const canvasCtx = canvas.getContext('2d');
+      
+      function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio;
+        canvas.height = canvas.parentElement.clientHeight * window.devicePixelRatio;
+        canvasCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      }
+      resizeCanvas();
+
+      function draw() {
+        animationFrameId = requestAnimationFrame(draw);
+        
+        const width = canvas.width / window.devicePixelRatio;
+        const height = canvas.height / window.devicePixelRatio;
+
+        canvasCtx.fillStyle = 'rgba(234, 245, 255, 0.25)'; // サックスホワイト背景とブレンド
+        canvasCtx.fillRect(0, 0, width, height);
+
+        if (!isPlaying || !analyser) {
+          canvasCtx.lineWidth = 1;
+          canvasCtx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(0, height / 2);
+          canvasCtx.lineTo(width, height / 2);
+          canvasCtx.stroke();
+          return;
+        }
+
+        analyser.getByteTimeDomainData(dataArray);
+        canvasCtx.lineWidth = 1.5;
+        
+        const gradient = canvasCtx.createLinearGradient(0, 0, width, 0);
+        gradient.addColorStop(0, 'rgba(96, 165, 250, 0.2)');
+        gradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.6)');
+        gradient.addColorStop(1, 'rgba(96, 165, 250, 0.2)');
+        canvasCtx.strokeStyle = gradient;
+
+        canvasCtx.beginPath();
+
+        const sliceWidth = width * 1.0 / dataArray.length;
+        let x = 0;
+
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = dataArray[i] / 128.0;
+          const y = v * height / 2;
+
+          if (i === 0) {
+            canvasCtx.moveTo(x, y);
+          } else {
+            canvasCtx.lineTo(x, y);
+          }
+          x += sliceWidth;
+        }
+
+        canvasCtx.lineTo(width, height / 2);
+        canvasCtx.stroke();
+      }
+
+      draw();
+    }
+
+    // ----------------------------------------------------
+    // 起動処理
+    // ----------------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadDatasets();
+      
+      // スライダー進捗の初期レンダリング
+      updateSliderTrack(document.getElementById('slider-base-freq'));
+      updateSliderTrack(document.getElementById('slider-volume'));
+    });
+  </script>
+</body>
+</html>
