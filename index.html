@@ -197,7 +197,7 @@
         intervals: [
           { id: "ratio-5-3", name: "5:3 純正長6度 (5限界)", ratio: 1.6666666666666667, ratioText: "5:3", cents: 884.36, deviation: "-15.6¢", tag: "5限界純正律", desc: "第5倍音に基づく純正長6度。うなりが完全に解消された極めて純粋な協和を示します。" },
           { id: "ratio-855-512", name: "855:512 長6度 (19限界ハイブリッド)", ratio: 1.669921875, ratioText: "855:512", cents: 887.73, deviation: "-12.3¢", tag: "19限界・みなし基音防衛", desc: "5:3とミーントーンの間に緻密に配置された調和的な19限界長6度です。" },
-          { id: "ratio-12tet", name: "12平均律 長6度", ratio: 1.681792830507429, ratioText: "2^(3/4)", cents: 900.0, deviation: "0.0¢", tag: "世界標準", desc: "オクターブを12等分した標準。利便性が高い一方、純正な響きからはわずかに外れます。" }
+          { id: "ratio-12edo", name: "12EDO 長6度", ratio: 1.681792830507429, ratioText: "2^(3/4)", cents: 900.0, deviation: "0.0¢", tag: "世界標準", desc: "オクターブを12等分した標準。利便性が高い一方、純正な響きからはわずかに外れます。" }
         ]
       },
       {
@@ -207,7 +207,7 @@
         defaultBaseFreq: 261.63,
         targetName: "3rd",
         intervals: [
-          { id: "ratio-12tet", name: "12平均律 短3度", ratio: 1.189207115002721, ratioText: "2^(3/12)", cents: 300.0, deviation: "0.0¢", tag: "世界標準", desc: "標準的な短3度。純正律に比べてやや狭く、独特のうなりを伴います。" },
+          { id: "ratio-12edo", name: "12EDO 短3度", ratio: 1.189207115002721, ratioText: "2^(3/12)", cents: 300.0, deviation: "0.0¢", tag: "世界標準", desc: "標準的な短3度。純正律に比べてやや狭く、独特のうなりを伴います。" },
           { id: "ratio-6-5", name: "6:5 純正短3度 (5限界)", ratio: 1.2, ratioText: "6:5", cents: 315.64, deviation: "+15.6¢", tag: "5限界純正律", desc: "倍音比6:5に基づく純正短3度。うなりが完全に消失した透明感の高い響きを奏でます。" }
         ]
       }
@@ -237,7 +237,7 @@
     let melodicIntervalId = null;
     let melodicStep = 0;
 
-    // 12平均律(A=440Hz)を定規として使い、音名とセントズレを算出
+    // 12EDO(A=440Hz)を定規として使い、音名とセントズレを算出
     function freqToNoteRef(freq) {
       if (!freq || freq <= 0) return "--";
       const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -359,7 +359,7 @@
           
           <div class="accordion-content overflow-hidden transition-all duration-300" style="max-height: ${isActive ? '200px' : '0px'}; opacity: ${isActive ? '1' : '0'};">
             <p class="text-[11px] text-slate-500 mt-2.5 pt-2 border-t border-slate-200/10 leading-relaxed text-glow">
-              ${item.desc} <span class="font-medium text-slate-600">（12TET基準差: ${item.deviation}）</span>
+              ${item.desc} <span class="font-medium text-slate-600">（12EDO基準差: ${item.deviation}）</span>
             </p>
           </div>
         `;
